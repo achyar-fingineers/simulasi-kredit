@@ -917,7 +917,7 @@ body.panduan-open .container{transition:padding-top .3s ease}
           <div class="fw"><input class="fi" id="driveClientIdInput" placeholder="xxxxx.apps.googleusercontent.com" style="font-size:11px"></div></div>
           <button class="btn-goal" onclick="simpanDriveClientId()" style="background:#0f766e;margin-top:6px">💾 Simpan Client ID</button>
           <div style="font-size:10px;color:#64748b;line-height:1.6;margin-top:6px">
-            Dibuat sekali di Google Cloud Console (gratis). Tanpa ini, tombol di atas memakai mode offline (pilih folder / share sheet).
+            Biasanya sudah terisi bawaan dari app — anggota tim tidak perlu mengubah apa pun di sini. Kolom ini hanya untuk Achyar bila ingin memakai Client ID lain di perangkat ini.
           </div>
         </div>
       </div>
@@ -2728,13 +2728,24 @@ function buildExportPayload(){
 // GOOGLE DRIVE ONLINE (OAuth resmi) — upload & buka dari cloud
 // Butuh app di-hosting (https) + Client ID dari Google Cloud Console
 // ═══════════════════════════════════════════════════════
+// ┌──────────────────────────────────────────────────────────────────┐
+// │  ISI SATU BARIS INI SEKALI SAJA (oleh Achyar)                    │
+// │  Tempel Client ID di antara tanda kutip di bawah. Setelah itu    │
+// │  seluruh anggota tim tidak perlu mengisi apa pun — begitu buka   │
+// │  alamat app, tombol login Google langsung siap dipakai.          │
+// └──────────────────────────────────────────────────────────────────┘
+const DRIVE_CLIENT_ID_BAWAAN = '241971899258-mnjmub7cmppogodas1cinm4vs14eou9l.apps.googleusercontent.com';
+
 const DRIVE_FOLDER_NAME = 'Simulasi Kredit ACC';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 let _driveToken = null;        // {access_token, exp}
 let _driveFolderId = null;
 let _driveTokenClient = null;
 
-function driveClientId(){ return (localStorage.getItem('kredit_drive_client_id')||'').trim(); }
+// Pakai Client ID bawaan app; isian manual (bila ada) menimpanya.
+function driveClientId(){
+  return (localStorage.getItem('kredit_drive_client_id') || DRIVE_CLIENT_ID_BAWAAN || '').trim();
+}
 function setDriveClientId(v){
   localStorage.setItem('kredit_drive_client_id', (v||'').trim());
   _driveToken = null; _driveTokenClient = null; _driveFolderId = null;
@@ -2938,7 +2949,7 @@ function renderDriveStatus(){
     el.innerHTML = '<span class="drv-off">⚠️ Mode offline — app dibuka sebagai file lokal. '+
       'Upload online butuh app di-hosting (https).</span>';
   } else if(!driveClientId()){
-    el.innerHTML = '<span class="drv-off">⚙️ Client ID Google belum diisi (lihat Pengaturan di bawah).</span>';
+    el.innerHTML = '<span class="drv-off">⚙️ Koneksi Google belum disiapkan. Hubungi Achyar.</span>';
   } else if(driveSignedIn()){
     el.innerHTML = '<span class="drv-on">✅ Terhubung ke Google Drive</span> '+
       '<button class="drv-link" onclick="driveLogout()">keluar</button>';
