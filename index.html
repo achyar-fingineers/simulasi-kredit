@@ -340,6 +340,10 @@ body{background:radial-gradient(ellipse at top,#131a2c 0%,#0a0e1a 55%) fixed}
 .drv-on{color:#4ade80}
 .drv-off{color:#94a3b8;font-weight:600}
 .drv-link{background:none;border:none;color:#22d3ee;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline}
+.drv-aktif{font-size:10.5px;line-height:1.6;padding:8px 10px;border-radius:8px;margin-bottom:9px;
+  background:rgba(15,23,42,.6);border:1px solid rgba(148,163,184,.18);color:#94a3b8;word-break:break-all}
+.drv-aktif b{color:#e2e8f0}
+.drv-aktif .rusak{display:block;margin-top:6px;padding-top:6px;border-top:1px solid rgba(245,158,11,.25);color:#fcd34d}
 .drive-list{max-height:260px;overflow-y:auto;border:1px solid rgba(148,163,184,.2);border-radius:9px;padding:6px;margin-bottom:10px;background:rgba(15,23,42,.5)}
 .drive-file{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 10px;margin-bottom:4px;background:rgba(30,41,59,.7);border:1px solid rgba(148,163,184,.14);border-radius:7px;cursor:pointer;font-family:inherit;transition:all .15s}
 .drive-file:hover{background:rgba(51,65,85,.9);border-color:rgba(34,211,238,.4)}
@@ -913,9 +917,11 @@ body.panduan-open .container{transition:padding-top .3s ease}
         </div>
         <button class="drv-link" onclick="toggleDriveSetting()" style="margin-top:8px">⚙️ Pengaturan koneksi Google</button>
         <div id="driveSettingBox" style="display:none;margin-top:8px">
+          <div id="driveCidAktif" class="drv-aktif"></div>
           <div class="f"><div class="fh"><label class="fl">Google OAuth Client ID</label><span class="fn">sekali isi, tersimpan</span></div>
           <div class="fw"><input class="fi" id="driveClientIdInput" placeholder="xxxxx.apps.googleusercontent.com" style="font-size:11px"></div></div>
           <button class="btn-goal" onclick="simpanDriveClientId()" style="background:#0f766e;margin-top:6px">💾 Simpan Client ID</button>
+          <button class="drv-link" onclick="hapusCidPerangkat()" style="margin-top:8px">🧹 Hapus simpanan perangkat ini (pakai bawaan app)</button>
           <div style="font-size:10px;color:#64748b;line-height:1.6;margin-top:6px">
             Biasanya sudah terisi bawaan dari app — anggota tim tidak perlu mengubah apa pun di sini. Kolom ini hanya untuk Achyar bila ingin memakai Client ID lain di perangkat ini.
           </div>
@@ -2742,9 +2748,23 @@ let _driveToken = null;        // {access_token, exp}
 let _driveFolderId = null;
 let _driveTokenClient = null;
 
-// Pakai Client ID bawaan app; isian manual (bila ada) menimpanya.
+// Client ID yang benar selalu berakhiran .apps.googleusercontent.com
+function cidValid(v){ return /^[\w-]+\.apps\.googleusercontent\.com$/.test(String(v||'').trim()); }
+
+// Pakai Client ID bawaan app. Isian manual hanya dipakai bila bentuknya benar —
+// simpanan yang rusak (mis. tempelan terpotong di HP) diabaikan, supaya tidak
+// diam-diam menimpa bawaan app dan menimbulkan error invalid_client.
 function driveClientId(){
-  return (localStorage.getItem('kredit_drive_client_id') || DRIVE_CLIENT_ID_BAWAAN || '').trim();
+  const simpan = (localStorage.getItem('kredit_drive_client_id') || '').trim();
+  if(cidValid(simpan)) return simpan;
+  return (DRIVE_CLIENT_ID_BAWAAN || '').trim();
+}
+
+// Dari mana Client ID yang sedang dipakai + apakah ada simpanan rusak
+function cidAsal(){
+  const simpan = (localStorage.getItem('kredit_drive_client_id') || '').trim();
+  if(cidValid(simpan)) return {asal:'perangkat ini', rusak:''};
+  return {asal:'bawaan app', rusak:simpan};
 }
 function setDriveClientId(v){
   localStorage.setItem('kredit_drive_client_id', (v||'').trim());
@@ -2964,16 +2984,43 @@ function toggleDriveSetting(){
   if(!b) return;
   const show = b.style.display==='none' || !b.style.display;
   b.style.display = show ? 'block' : 'none';
-  if(show){
-    const i = document.getElementById('driveClientIdInput');
-    if(i) i.value = driveClientId();
-  }
+  if(show) renderCidAktif();
+}
+
+// Tampilkan Client ID yang BENAR-BENAR sedang dipakai, biar masalah tempelan
+// terpotong langsung kelihatan dan tidak perlu ditebak-tebak.
+function renderCidAktif(){
+  const kotak = document.getElementById('driveCidAktif');
+  const inp = document.getElementById('driveClientIdInput');
+  if(!kotak) return;
+  const cid = driveClientId();
+  const {asal, rusak} = cidAsal();
+  if(inp) inp.value = cidValid(localStorage.getItem('kredit_drive_client_id')||'') ? cid : '';
+  kotak.innerHTML = cid
+    ? `Sedang dipakai (<b>${escapeHTML(asal)}</b>):<br><b>${escapeHTML(cid)}</b>` +
+      (rusak ? `<span class="rusak">⚠️ Ada simpanan lama di perangkat ini yang bentuknya tidak sah
+         (<b>${escapeHTML(rusak.slice(0,42))}${rusak.length>42?'…':''}</b>) — sudah diabaikan.
+         Tekan <b>Hapus simpanan perangkat ini</b> untuk membersihkannya.</span>` : '')
+    : '⚠️ Belum ada Client ID sama sekali.';
+}
+
+function hapusCidPerangkat(){
+  localStorage.removeItem('kredit_drive_client_id');
+  _driveToken = null; _driveTokenClient = null; _driveFolderId = null;
+  renderCidAktif(); renderDriveStatus();
+  showToast('🧹 Simpanan perangkat dibersihkan — kembali ke Client ID bawaan app');
 }
 function simpanDriveClientId(){
   const i = document.getElementById('driveClientIdInput');
   if(!i) return;
-  setDriveClientId(i.value);
-  showToast(i.value.trim() ? '✅ Client ID disimpan' : 'Client ID dikosongkan');
+  const v = i.value.trim();
+  if(v && !cidValid(v)){
+    showToast('⚠️ Client ID tidak lengkap — harus berakhiran .apps.googleusercontent.com');
+    return;   // jangan disimpan, biar tidak menimpa bawaan app dengan yang rusak
+  }
+  setDriveClientId(v);
+  renderCidAktif();
+  showToast(v ? '✅ Client ID disimpan' : '🧹 Kembali memakai Client ID bawaan app');
 }
 
 // ═══════════════════════════════════════════════════════
